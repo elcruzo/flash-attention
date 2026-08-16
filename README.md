@@ -1,32 +1,50 @@
 # FlashAttention-2 (tiled online softmax)
 
-Reference implementation of the **FA-2 algorithm** in NumPy. Tests never call `F.scaled_dot_product_attention`.
+Reference implementation of the **FA-2 algorithm** in NumPy — forward **and** backward. Tests never call `F.scaled_dot_product_attention`.
 
 ## Papers
 
 - Dao et al., *FlashAttention: Fast and Memory-Efficient Exact Attention* (2022) — IO-aware tiling, online softmax.
-- Dao, *FlashAttention-2* (2023) — better work partitioning; this folder implements **this** recurrence.
-- Shah et al., *FlashAttention-3* (2024) — Hopper asynchrony (TMA, WGMMA, warp specialization, FP8). **Documented only.** No Hopper / async hardware is required; `flash_attn.cu` is the synchronous FA-2 kernel.
+- Dao, *FlashAttention-2* (2023) — better work partitioning; this folder implements **this** recurrence (Algorithms 1–2).
+- Shah et al., *FlashAttention-3* (2024) — Hopper asynchrony (TMA, WGMMA, warp specialization, FP8). **Documented only.** No CUDA FA-3 kernel runs on Mac; `flash_attn.cu` is the synchronous FA-2 forward sketch.
 
-## Algorithm
+## Forward (Algorithm 1)
 
 Tile Q into `Br` rows and K/V into `Bc` columns. For each Q-tile, stream K/V tiles:
 
 ```
 S_ij = Q_i K_j^T / sqrt(d)          # shape (Br, Bc) only
 m'   = max(m, rowmax(S_ij))
-P    = exp(S_ij - m')
-l'   = exp(m - m') * l + rowsum(P)
-O    = exp(m - m') * O + P V_j
+P̃    = exp(S_ij - m')
+l'   = exp(m - m') * l + rowsum(P̃)
+Õ    = exp(m - m') * Õ + P̃ V_j
 ```
 
-Causal: mask `S_ij` where `k_idx > q_idx` before the row-max. Final `O /= l`.
+Causal: mask `S_ij` where `k_idx > q_idx` before the row-max. Final `O = Õ / l`, and save `L = m + log(l)` (logsumexp) for backward.
 
-The reference **loops tiles** and never allocates an `(N, N)` score matrix. Peak extra score storage is `Br * Bc`.
+Peak extra score storage is `Br * Bc` — never an `(N, N)` score matrix.
 
-## Backward
+## Backward (Algorithm 2)
 
-**Omitted.** A correct FA-2 backward recomputes tiles from saved `m, l` (and optionally O) instead of storing `P`. Only the forward is implemented and tested.
+Recompute attention tiles from saved `L` (do not store `P`):
+
+```
+D_i  = rowsum(dO ◦ O)
+# outer loop over K/V tiles j, inner over Q tiles i:
+S_ij = Q_i K_j^T / sqrt(d)          # (Br, Bc) only
+P_ij = exp(S_ij - L_i)
+dV_j += P_ij^T dO_i
+dP   = dO_i V_j^T
+dS   = P_ij ◦ (dP - D_i)
+dQ_i += dS K_j / sqrt(d)
+dK_j += dS^T Q_i / sqrt(d)
+```
+
+Gradients are checked against a full-matrix naive oracle and central finite differences.
+
+## FA-3 (Hopper only — not claimed here)
+
+FA-3 keeps the same math but changes the **schedule**: producer/consumer warp specialization, TMA async copies, overlapping softmax with asynchronous WGMMA, plus FP8 block quantization. That requires NVIDIA Hopper (H100). This repo documents it; it does not ship a Hopper FA-3 CUDA kernel.
 
 ## Papers on disk
 

@@ -13,7 +13,7 @@
 //   mi  [Br]       — running row-max
 //   li  [Br]       — running row-sum of exp
 //
-// Algorithm (Dao et al. FA-2, synchronous):
+// Algorithm (Dao et al. FA-2, synchronous forward):
 //   for each Q-tile i:
 //     O=0; l=0; m=-inf
 //     for each K/V-tile j:
@@ -23,11 +23,14 @@
 //       l' = exp(m-m')*l + rowsum(P)
 //       O  = exp(m-m')*O + P @ Vj
 //       m,l = m',l'
-//     O /= l
+//     O /= l;  L = m + log(l)   // L used by Python tiled backward
 //
-// FA-3 (Shah et al. 2024, Hopper only — documented, not required):
+// Backward lives in flash_attn.py (Algorithm 2): recompute P from L on (Br,Bc)
+// tiles; outer loop over K/V tiles. No CUDA backward here.
+//
+// FA-3 (Shah et al. 2024, Hopper only — documented, not claimed on Mac):
 //   Same math, different schedule: TMA async copies, WGMMA, producer/consumer
-//   warp specialization, FP8. This file is the FA-2 synchronous algorithm and
+//   warp specialization, FP8. This file is the FA-2 synchronous forward and
 //   will compile on any sm that has CUDA; it does not use Hopper async.
 
 #include <cuda_runtime.h>
