@@ -28,6 +28,12 @@ The reference **loops tiles** and never allocates an `(N, N)` score matrix. Peak
 
 **Omitted.** A correct FA-2 backward recomputes tiles from saved `m, l` (and optionally O) instead of storing `P`. Only the forward is implemented and tested.
 
+## Papers on disk
+
+- [`papers/dao-flashattention-2022.pdf`](papers/dao-flashattention-2022.pdf) — Dao et al. FlashAttention (2022) ([arXiv:2205.14135](https://arxiv.org/abs/2205.14135))
+- [`papers/dao-flashattention-2-2023.pdf`](papers/dao-flashattention-2-2023.pdf) — Dao. FlashAttention-2 (2023) ([arXiv:2307.08691](https://arxiv.org/abs/2307.08691))
+- [`papers/shah-flashattention-3-2024.pdf`](papers/shah-flashattention-3-2024.pdf) — Shah et al. FlashAttention-3 (2024) ([arXiv:2407.08608](https://arxiv.org/abs/2407.08608))
+
 ## Run
 
 ```bash
