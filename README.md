@@ -55,7 +55,7 @@ FA-3 keeps the same math but changes the **schedule**: producer/consumer warp sp
 ## Run
 
 ```bash
-python demo.py
+python main.py
 python -m pytest test_flash_attn.py -q
 ```
 
