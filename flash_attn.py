@@ -75,14 +75,24 @@ def naive_attention_backward(
     return dq, dk, dv
 
 
-def _online_softmax_from_tiles(row_tiles: list[np.ndarray]) -> np.ndarray:
-    """Online softmax over a sequence of 1-D score tiles. Equals full softmax."""
+def _online_softmax_from_tiles(
+    row_tiles: list[np.ndarray],
+    *,
+    poison_d: float | None = None,
+) -> np.ndarray:
+    """Online softmax over a sequence of 1-D score tiles. Equals full softmax.
+
+    Uses running (m, d). If poison_d is set, replace d before the final normalize —
+    output must then diverge from safe softmax (proves d is actually used).
+    """
     m, d = -np.inf, 0.0
     for tile in row_tiles:
         block_m = float(np.max(tile)) if tile.size else -np.inf
         m_new = block_m if block_m > m else m
         d = d * np.exp(m - m_new) + float(np.sum(np.exp(tile - m_new)))
         m = m_new
+    if poison_d is not None:
+        d = poison_d
     parts = [np.exp(t - m) / d for t in row_tiles]
     return np.concatenate(parts)
 

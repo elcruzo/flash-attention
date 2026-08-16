@@ -45,6 +45,10 @@ def test_tiles_never_allocate_nxn():
     assert all(r <= 16 and c <= 16 for r, c in stats["score_shapes"])
     assert all(r * c <= 16 * 16 for r, c in stats["score_shapes"])
     assert (n, n) not in stats["score_shapes"]
+    row_sizes = [min(16, n - i) for i in range(0, n, 16)]
+    col_sizes = [min(16, n - j) for j in range(0, n, 16)]
+    expected = [(r, c) for r in row_sizes for c in col_sizes]
+    assert stats["score_shapes"] == expected
 
 
 def test_tile_count_non_multiple_edge():
@@ -72,6 +76,17 @@ def test_online_softmax_equals_full():
     m = np.max(row)
     full = np.exp(row - m) / np.sum(np.exp(row - m))
     assert np.allclose(online, full, atol=1e-10)
+
+
+def test_online_softmax_uses_running_d():
+    """Poison d after the tile pass — must diverge from safe softmax (AGENTS pitfall)."""
+    rng = np.random.default_rng(2)
+    row = rng.standard_normal(64)
+    tiles = [row[i : i + 8] for i in range(0, 64, 8)]
+    m = np.max(row)
+    full = np.exp(row - m) / np.sum(np.exp(row - m))
+    poisoned = online_softmax_from_tiles(tiles, poison_d=1e-30)
+    assert not np.allclose(poisoned, full, atol=1e-3)
 
 
 def test_batched_heads_shape():
