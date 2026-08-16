@@ -48,7 +48,7 @@ def test_tiles_never_allocate_nxn():
 
 
 def test_tile_count_non_multiple_edge():
-    """ceil(N/br)*ceil(N/bc) tiles; edge tiles smaller than (br, bc)."""
+    """Exact (r,c) grid for non-multiple N — not just count / ≤ (br,bc)."""
     rng = np.random.default_rng(11)
     n, d, br, bc = 37, 8, 16, 16
     q = rng.standard_normal((n, d))
@@ -56,12 +56,12 @@ def test_tile_count_non_multiple_edge():
     v = rng.standard_normal((n, d))
     stats: dict = {}
     flash_attention(q, k, v, causal=False, br=br, bc=bc, stats=stats)
-    want = math.ceil(n / br) * math.ceil(n / bc)
-    assert len(stats["score_shapes"]) == want
-    assert all(r <= br and c <= bc for r, c in stats["score_shapes"])
-    # At least one edge tile is smaller than a full (br, bc) block
-    assert any(r < br or c < bc for r, c in stats["score_shapes"])
-    assert stats["peak_score_elems"] <= br * bc
+    row_sizes = [min(br, n - i) for i in range(0, n, br)]
+    col_sizes = [min(bc, n - j) for j in range(0, n, bc)]
+    expected = [(r, c) for r in row_sizes for c in col_sizes]
+    assert stats["score_shapes"] == expected
+    assert stats["peak_score_elems"] == br * bc
+    assert (n % br, n % bc) in stats["score_shapes"]  # trailing edge (5, 5)
 
 
 def test_online_softmax_equals_full():
