@@ -52,6 +52,31 @@ FA-3 keeps the same math but changes the **schedule**: producer/consumer warp sp
 - [`papers/dao-flashattention-2-2023.pdf`](papers/dao-flashattention-2-2023.pdf) — Dao. FlashAttention-2 (2023) ([arXiv:2307.08691](https://arxiv.org/abs/2307.08691))
 - [`papers/shah-flashattention-3-2024.pdf`](papers/shah-flashattention-3-2024.pdf) — Shah et al. FlashAttention-3 (2024) ([arXiv:2407.08608](https://arxiv.org/abs/2407.08608))
 
+## Compared to flash-attn
+
+**What you learn here:**
+- FA-2 tiled online softmax forward + recomputed backward (Algorithms 1–2)
+- Peak score scratch is `Br×Bc`, never $N{\times}N$
+- Exact match to naive attention (no approximation)
+
+| | This repo | flash-attn / FA-2 CUDA |
+|---|---|---|
+| Runtime | NumPy CPU reference | CUDA A100/H100 kernels |
+| Goal | Correct tiling + grads | IO-aware wall-clock speedup |
+| FA-3 | Documented only | Hopper TMA/WGMMA |
+
+### Numbers (2026-08-16, Darwin 25.5.0 arm64 / Apple M5)
+
+| Metric | This repo | Baseline | Source |
+|---|---|---|---|
+| Fwd max \|err\| vs naive | $5.6{\times}10^{-16}$ (N=64) | 0 (exact) | `python main.py` |
+| Peak score elems | 256 vs $N^2{=}4096$ | linear in tiles | same |
+| Speedup vs naive | ~0.6× on CPU NumPy (N=256) | 3–10× vs PyTorch attn (A100) | Dao FA-2 2023; timed here |
+
+```bash
+python main.py
+```
+
 ## Run
 
 ```bash
