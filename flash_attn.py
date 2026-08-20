@@ -1,11 +1,11 @@
 """FlashAttention-2: tiled online-softmax forward and backward.
 
-Dao et al. FA-2 algorithm (not F.scaled_dot_product_attention):
-  Forward — tile Q into Br rows, K/V into Bc columns; keep only (Br, Bc) scores.
-  Backward — recompute P tiles from saved logsumexp L; never store the full P.
+Dao et al. FA-2 on NumPy:
+  Forward — tile Q into Br rows, K/V into Bc columns; keep (Br, Bc) scores.
+  Backward — recompute P tiles from saved logsumexp L.
 
-FA-3 (Shah et al.): Hopper TMA / WGMMA / warp specialization — documented in
-README only; this module is the synchronous FA-2 math on NumPy.
+This module is the runnable path. `flash_attn.cu` is a matching synchronous FA-2
+forward sketch (same Br/Bc recurrence). The README documents the Hopper FA-3 schedule.
 """
 
 from __future__ import annotations
@@ -121,7 +121,7 @@ def flash_attention(
     stats: dict[str, Any] | None = None,
     return_lse: bool = False,
 ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-    """FA-2 forward. Score scratch is only ever (Br, Bc) — never (N, N).
+    """FA-2 forward. Score scratch is `(Br, Bc)`.
 
     If return_lse is True, also returns row-wise logsumexp L = m + log(l)
     needed by the tiled backward (Algorithm 2).

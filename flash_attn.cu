@@ -1,4 +1,6 @@
-// FlashAttention-2 forward kernel (educational). Tests run flash_attn.py.
+// FlashAttention-2 forward kernel: synchronous SRAM schedule, Br=64, Bc=64.
+// Tests run flash_attn.py (NumPy Algorithms 1–2). This file is the matching
+// CUDA sketch of the same recurrence.
 //
 // Tiling (FA-2):
 //   Br = 64  — Q rows (and output rows) owned by this CTA
@@ -26,12 +28,10 @@
 //     O /= l;  L = m + log(l)   // L used by Python tiled backward
 //
 // Backward lives in flash_attn.py (Algorithm 2): recompute P from L on (Br,Bc)
-// tiles; outer loop over K/V tiles. No CUDA backward here.
+// tiles; outer loop over K/V tiles.
 //
-// FA-3 (Shah et al. 2024, Hopper only — documented, not claimed on Mac):
-//   Same math, different schedule: TMA async copies, WGMMA, producer/consumer
-//   warp specialization, FP8. This file is the FA-2 synchronous forward and
-//   will compile on any sm that has CUDA; it does not use Hopper async.
+// FA-3 (Shah et al. 2024): same math, Hopper TMA / WGMMA / warp specialization.
+// README documents that schedule. This kernel is FA-2 synchronous SRAM forward.
 
 #include <cuda_runtime.h>
 #include <math.h>

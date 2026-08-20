@@ -1,12 +1,12 @@
 # FlashAttention-2 (tiled online softmax)
 
-Reference implementation of the **FA-2 algorithm** in NumPy — forward **and** backward. Tests never call `F.scaled_dot_product_attention`.
+Reference implementation of the **FA-2 algorithm** in NumPy — forward **and** backward. Tests compare tiled output to a full-matrix NumPy oracle.
 
 ## Papers
 
 - Dao et al., *FlashAttention: Fast and Memory-Efficient Exact Attention* (2022) — IO-aware tiling, online softmax.
 - Dao, *FlashAttention-2* (2023) — better work partitioning; this folder implements **this** recurrence (Algorithms 1–2).
-- Shah et al., *FlashAttention-3* (2024) — Hopper asynchrony (TMA, WGMMA, warp specialization, FP8). **Documented only.** No CUDA FA-3 kernel runs on Mac; `flash_attn.cu` is the synchronous FA-2 forward sketch.
+- Shah et al., *FlashAttention-3* (2024) — Hopper asynchrony (TMA, WGMMA, warp specialization, FP8). Documented here; runnable code is FA-2 (`flash_attn.py` + the synchronous `flash_attn.cu` sketch).
 
 ## Forward (Algorithm 1)
 
@@ -22,11 +22,11 @@ Õ    = exp(m - m') * Õ + P̃ V_j
 
 Causal: mask `S_ij` where `k_idx > q_idx` before the row-max. Final `O = Õ / l`, and save `L = m + log(l)` (logsumexp) for backward.
 
-Peak extra score storage is `Br * Bc` — never an `(N, N)` score matrix.
+Peak extra score storage is `Br * Bc`.
 
 ## Backward (Algorithm 2)
 
-Recompute attention tiles from saved `L` (do not store `P`):
+Recompute attention tiles from saved `L`:
 
 ```
 D_i  = rowsum(dO ◦ O)
@@ -42,9 +42,9 @@ dK_j += dS^T Q_i / sqrt(d)
 
 Gradients are checked against a full-matrix naive oracle and central finite differences.
 
-## FA-3 (Hopper only — not claimed here)
+## FA-3 (Hopper schedule)
 
-FA-3 keeps the same math but changes the **schedule**: producer/consumer warp specialization, TMA async copies, overlapping softmax with asynchronous WGMMA, plus FP8 block quantization. That requires NVIDIA Hopper (H100). This repo documents it; it does not ship a Hopper FA-3 CUDA kernel.
+FA-3 keeps the same math and changes the **schedule**: producer/consumer warp specialization, TMA async copies, overlapping softmax with asynchronous WGMMA, plus FP8 block quantization. That schedule targets NVIDIA Hopper (H100). This folder documents it; the code here is FA-2.
 
 ## Papers on disk
 
@@ -56,7 +56,7 @@ FA-3 keeps the same math but changes the **schedule**: producer/consumer warp sp
 
 **What you learn here:**
 - FA-2 tiled online softmax forward + recomputed backward (Algorithms 1–2)
-- Peak score scratch is `Br×Bc`, never $N{\times}N$
+- Peak score scratch is `Br×Bc` ($N{=}64 \to 256$ vs $N^2{=}4096$ in `main.py`)
 - Exact match to naive attention (no approximation)
 
 | | This repo | flash-attn / FA-2 CUDA |
@@ -84,4 +84,4 @@ python main.py
 python -m pytest test_flash_attn.py -q
 ```
 
-`flash_attn.cu` is not compiled by the tests (`nvcc` optional).
+Tests run `flash_attn.py`. `flash_attn.cu` is optional `nvcc` source for the same FA-2 recurrence.
